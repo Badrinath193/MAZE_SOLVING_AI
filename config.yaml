@@ -1,0 +1,59 @@
+# Maze Detection Configuration
+maze_detection:
+  border_color: "auto"  # auto, white, black, custom
+  detection_threshold: 0.5
+  apply_morphology: true
+  border_detection_method: "canny"  # canny, sobel, laplacian
+  morph_kernel_size: 5
+  
+# Algorithm Configuration
+algorithms:
+  primary: "astar"  # astar, bfs, dfs, neural_network, rl_solver
+  fallback: "bfs"
+  multi_start: true  # Search from all openings simultaneously
+  timeout_seconds: 60
+  
+# Neural Network Configuration
+neural_network:
+  model_path: "models/cnn_maze_solver.h5"
+  confidence_threshold: 0.85
+  batch_size: 32
+  input_size: [512, 512]
+  use_pretrained: true
+  
+# Reinforcement Learning Configuration
+reinforcement_learning:
+  model_path: "models/rl_maze_solver.pkl"
+  learning_rate: 0.001
+  gamma: 0.99
+  epsilon: 1.0
+  epsilon_decay: 0.995
+  episodes: 1000
+  
+# Image Processing Configuration
+image_processing:
+  resize_to: [512, 512]
+  contrast_enhance: true
+  noise_reduction: "bilateral"  # bilateral, gaussian, median
+  normalize: true
+  auto_threshold: true
+  
+# Performance Configuration
+performance:
+  num_threads: 4
+  use_gpu: true
+  batch_processing: true
+  cache_preprocessed: true
+  
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_file: "logs/maze_solver.log"
+  console_output: true
+  
+# Visualization Configuration
+visualization:
+  show_intermediate_steps: true
+  save_solution_image: true
+  output_dir: "results/"
+  animation_speed: 50  # milliseconds per frame
