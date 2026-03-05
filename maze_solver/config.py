@@ -1,23 +1,25 @@
-# Configuration Settings for Maze Solver
+from __future__ import annotations
 
-class Config:
-    def __init__(self):
-        # Maze settings
-        self.maze_width = 20  # Width of the maze
-        self.maze_height = 20  # Height of the maze
-        self.start_position = (0, 0)  # Starting position in the maze
-        self.end_position = (19, 19)  # Ending position in the maze
+from dataclasses import dataclass
+from pathlib import Path
 
-        # Solver settings
-        self.solve_method = 'DFS'  # Method for solving the maze (DFS/BFS/A*)
-        self.delay = 0.1  # Delay between steps for visualization
+import yaml
 
-        # Additional settings can be added here
 
-    def display_settings(self):
-        print("Maze Width:", self.maze_width)
-        print("Maze Height:", self.maze_height)
-        print("Start Position:", self.start_position)
-        print("End Position:", self.end_position)
-        print("Solver Method:", self.solve_method)
-        print("Delay between steps:", self.delay)
+@dataclass
+class SolverConfig:
+    input_dir: str = "input"
+    output_dir: str = "input/solved_mazes"
+    output_pdf: str = "outputs/output.pdf"
+    threshold: int = 128
+    path_thickness: int = 3
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> "SolverConfig":
+        data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+        image_processing = data.get("image_processing", {})
+        visualization = data.get("visualization", {})
+        return cls(
+            threshold=128 if image_processing.get("auto_threshold", True) else 128,
+            path_thickness=max(1, int(visualization.get("animation_speed", 50) // 25)),
+        )

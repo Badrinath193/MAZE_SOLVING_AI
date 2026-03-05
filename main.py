@@ -1,146 +1,52 @@
-import os
-from matplotlib.image import imsave
-import numpy as np
-import PIL
-import cv2
-from time import time
-from collections import deque
+from __future__ import annotations
 
-# Set default folder path
-DEFAULT_FOLDER_PATH = "C:\\Users\\tshiv\Desktop\\aimaze\MAZE_SOLVING_AI\\input"
+import argparse
+from pathlib import Path
 
-def preprocess_image(img_path):
-    img = np.asarray(PIL.Image.open(img_path).convert('L'))
-    binary_img = (img > 128).astype(np.uint8) * 255
-    return binary_img
+from PIL import Image
 
-def find_start_end(binary_img):
-    start, end = None, None
+from maze_solver.solver import SUPPORTED_IMAGE_FORMATS, solve_maze_image
 
-    for j in range(binary_img.shape[1]):
-        if binary_img[0, j] == 255:
-            start = (0, j)
-        if binary_img[-1, j] == 255:
-            end = (binary_img.shape[0] - 1, j)
 
-    if start and end:
-        return start, end
-
-    for i in range(binary_img.shape[0]):
-        if binary_img[i, 0] == 255:
-            start = (i, 0)
-        if binary_img[i, -1] == 255:
-            end = (i, binary_img.shape[1] - 1)
-
-    if start and end:
-        return start, end
-
-    raise ValueError("Start or end point not found in the maze.")
-
-def optimized_flooding_search(binary_img, start, end):
-    rows, cols = binary_img.shape
-    neighbors = [(0, 1), (1, 0), (0, -1), (-1, 0)]
-
-    queue = deque([start])
-    came_from = {}
-    visited = np.zeros(binary_img.shape, dtype=bool)
-    visited[start] = True
-
-    while queue:
-        current = queue.popleft()
-        if current == end:
-            break
-
-        for dx, dy in neighbors:
-            neighbor = (current[0] + dx, current[1] + dy)
-            if 0 <= neighbor[0] < rows and 0 <= neighbor[1] < cols:
-                if binary_img[neighbor] == 255 and not visited[neighbor]:
-                    queue.append(neighbor)
-                    visited[neighbor] = True
-                    came_from[neighbor] = current
-                    if neighbor == end:
-                        return came_from
-
-    return came_from
-
-def reconstruct_path(came_from, start, end):
-    path = []
-    current = end
-    while current != start:
-        path.append(current)
-        current = came_from[current]
-    path.append(start)
-    path.reverse()
-    return path
-
-def optimized_visualize_maze(binary_img, path, explored, path_thickness=3):
-    color_img = np.zeros((*binary_img.shape, 3), dtype=np.uint8)
-    color_img[binary_img == 255] = [255, 255, 255]
-    color_img[binary_img == 0] = [0, 0, 0]
-
-    # Mark explored cells in red
-    explored = np.array(explored)
-    color_img[explored[:, 0], explored[:, 1]] = [255, 0, 0]
-
-    # Create a separate mask for the path and draw the path in green with increased thickness
-    path_img = np.zeros(binary_img.shape, dtype=np.uint8)
-    for r, c in path:
-        path_img[r, c] = 255
-
-    # Use OpenCV to dilate the path to increase thickness
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (path_thickness, path_thickness))
-    thick_path = cv2.dilate(path_img, kernel)
-
-    color_img[thick_path > 0] = [0, 255, 0]  # Draw the thick green path
-
-    return color_img
-
-def main():
-    folder_path = DEFAULT_FOLDER_PATH
-
-    if not os.path.exists(folder_path):
-        print(f"Error: Folder '{folder_path}' does not exist.")
-        return
-
-    # Get all image files in the folder
-    supported_formats = [".png", ".jpg", ".jpeg", ".bmp", ".gif"]
-    image_files = [f for f in os.listdir(folder_path) if os.path.splitext(f)[1].lower() in supported_formats]
-
+def process_folder(input_dir: Path, output_dir: Path) -> int:
+    image_files = sorted([p for p in input_dir.iterdir() if p.suffix.lower() in SUPPORTED_IMAGE_FORMATS])
     if not image_files:
-        print("No supported image files found in the folder.")
-        return
+        print(f"No supported image files found in {input_dir}")
+        return 1
 
-    output_folder = os.path.join(folder_path, "solved_mazes")
-    os.makedirs(output_folder, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
+    solved_count = 0
     for image_file in image_files:
-        img_path = os.path.join(folder_path, image_file)
-        print(f"Processing: {image_file}")
-
-        binary_img = preprocess_image(img_path)
+        print(f"Processing: {image_file.name}")
         try:
-            start, end = find_start_end(binary_img)
-        except ValueError as e:
-            print(f"Error: {e} in {image_file}")
+            solved, path = solve_maze_image(image_file)
+        except ValueError as exc:
+            print(f"Skipped {image_file.name}: {exc}")
             continue
 
-        print("Solving the maze...")
-        st_time = time()
-        came_from = optimized_flooding_search(binary_img, tuple(start), tuple(end))
-        if not came_from:
-            print(f"No solution found for {image_file}.")
-            continue
+        out_file = output_dir / f"solved_{image_file.name}"
+        Image.fromarray(solved).save(out_file)
+        print(f"Saved {out_file} (path length: {len(path)})")
+        solved_count += 1
 
-        path = reconstruct_path(came_from, tuple(start), tuple(end))
-        explored = list(came_from.keys())
-        print(f"Maze {image_files.index(image_file) + 1}/{len(image_files)} solved in {time() - st_time:.2f} seconds.")
+    print(f"Completed. Solved {solved_count}/{len(image_files)} maze(s).")
+    return 0 if solved_count else 1
 
-        print("Visualizing the solution...")
-        result_img = optimized_visualize_maze(binary_img, path, explored)
-        
-        output_path = os.path.join(output_folder, f"solved_{image_file}")
-        PIL.Image.fromarray(result_img).save(output_path)
-        print(f"Solution saved as {output_path}")
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Batch maze solver for image files.")
+    parser.add_argument("--input", default="input", help="Folder containing maze images.")
+    parser.add_argument("--output", default=None, help="Output folder for solved images (default: <input>/solved_mazes)")
+    return parser.parse_args()
+
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    input_dir = Path(args.input).expanduser().resolve()
+    output_dir = Path(args.output).expanduser().resolve() if args.output else input_dir / "solved_mazes"
+
+    if not input_dir.exists():
+        raise SystemExit(f"Input folder does not exist: {input_dir}")
+
+    raise SystemExit(process_folder(input_dir, output_dir))
