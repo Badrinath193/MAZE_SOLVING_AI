@@ -1,38 +1,37 @@
-import os
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
 from PIL import Image
 
-def convert_images_to_pdf(folder_path, output_pdf):
-    """
-    Convert all image files in a folder into a single PDF.
+from maze_solver.solver import SUPPORTED_IMAGE_FORMATS
 
-    Parameters:
-    folder_path (str): Path to the folder containing images.
-    output_pdf (str): Path to save the output PDF.
-    """
-    supported_formats = [".png", ".jpg", ".jpeg", ".bmp", ".gif"]
 
-    image_files = [
-        os.path.join(folder_path, f)
-        for f in os.listdir(folder_path)
-        if os.path.splitext(f)[1].lower() in supported_formats
-    ]
-
+def convert_images_to_pdf(folder_path: Path, output_pdf: Path) -> None:
+    image_files = sorted([p for p in folder_path.iterdir() if p.suffix.lower() in SUPPORTED_IMAGE_FORMATS])
     if not image_files:
-        print("No supported image files found in the specified folder.")
-        return
+        raise ValueError(f"No supported image files found in: {folder_path}")
 
-    # Open images and convert them to RGB mode for compatibility with PDF
     images = [Image.open(img).convert("RGB") for img in image_files]
-
-    # Save as PDF
+    output_pdf.parent.mkdir(parents=True, exist_ok=True)
     images[0].save(output_pdf, save_all=True, append_images=images[1:])
-    print(f"All images have been successfully converted into a single PDF: {output_pdf}")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Convert solved maze images into one PDF")
+    parser.add_argument("--input", default="input/solved_mazes", help="Folder containing solved images")
+    parser.add_argument("--output", default="outputs/output.pdf", help="Output PDF path")
+    return parser.parse_args()
+
 
 if __name__ == "__main__":
+    args = parse_args()
+    in_dir = Path(args.input).expanduser().resolve()
+    out_pdf = Path(args.output).expanduser().resolve()
 
-    folder_path = "D:\\hackathon\\Maze\\input\\solved_mazes" #folder of solved images
+    if not in_dir.exists():
+        raise SystemExit(f"Input folder does not exist: {in_dir}")
 
-    output_pdf = "D:\\hackathon\\Maze\\outputs\\output.pdf" #include .pdf
-
-    # Convert images to PDF
-    convert_images_to_pdf(folder_path, output_pdf)
+    convert_images_to_pdf(in_dir, out_pdf)
+    print(f"Saved PDF: {out_pdf}")
